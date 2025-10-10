@@ -2,7 +2,7 @@ FROM ubuntu:20.04
 SHELL ["/bin/bash","-c"]
 RUN groupadd -r keydb && useradd -r -g keydb keydb
 # use gosu for easy step-down from root: https://github.com/tianon/gosu/releases
-ENV GOSU_VERSION 1.14
+ENV GOSU_VERSION=1.14
 RUN set -eux; \
         savedAptMark="$(apt-mark showmanual)"; \
         apt-get update; \
@@ -23,7 +23,11 @@ RUN set -eux; \
         gosu --version; \
         gosu nobody true
 # build KeyDB
-ARG BRANCH
+
+COPY . /tmp/KeyDB
+# fail if /tmp/KeyDB does not contain src folder, print message that build script must be run from repo root
+RUN [ -d /tmp/KeyDB/src ] || (echo '/tmp/KeyDB does not contain src folder, build script must be run from repo root' && exit 1)
+
 RUN set -eux; \
         \
         savedAptMark="$(apt-mark showmanual)"; \
@@ -47,7 +51,6 @@ RUN set -eux; \
                 libsnappy-dev \
                 libssl-dev \
                 git; \
-        cd /tmp && git clone --branch $BRANCH https://github.com/Snapchat/KeyDB.git --recursive; \
         cd /tmp/KeyDB; \
         # disable protected mode as it relates to docker
         grep -E '^ *createBoolConfig[(]"protected-mode",.*, *1 *,.*[)],$' ./src/config.cpp; \
