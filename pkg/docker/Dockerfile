@@ -23,8 +23,9 @@ RUN set -eux; \
         gosu --version; \
         gosu nobody true
 # build KeyDB
-
+RUN pwd
 COPY . /tmp/KeyDB
+RUN ls /tmp/KeyDB
 # fail if /tmp/KeyDB does not contain src folder, print message that build script must be run from repo root
 RUN [ -d /tmp/KeyDB/src ] || (echo '/tmp/KeyDB does not contain src folder, build script must be run from repo root' && exit 1)
 
@@ -56,6 +57,9 @@ RUN set -eux; \
         grep -E '^ *createBoolConfig[(]"protected-mode",.*, *1 *,.*[)],$' ./src/config.cpp; \
         sed -ri 's!^( *createBoolConfig[(]"protected-mode",.*, *)1( *,.*[)],)$!\10\2!' ./src/config.cpp; \
         grep -E '^ *createBoolConfig[(]"protected-mode",.*, *0 *,.*[)],$' ./src/config.cpp; \
+        find . -type f -name "*.sh" -exec chmod +x {} +; \
+        chmod +x ./deps/jemalloc/configure; \
+	chmod +x ./deps/rocksdb/build_tools/build_detect_platform; \
         make -j$(nproc) BUILD_TLS=yes ENABLE_FLASH=yes; \
         cd src; \
         strip keydb-cli keydb-benchmark keydb-check-rdb keydb-check-aof keydb-diagnostic-tool keydb-sentinel keydb-server; \
