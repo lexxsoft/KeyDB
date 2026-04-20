@@ -1,4 +1,5 @@
-FROM ubuntu:20.04
+ARG UBUNTU_VERSION=20.04
+FROM ubuntu:${UBUNTU_VERSION}
 SHELL ["/bin/bash","-c"]
 RUN groupadd -r keydb && useradd -r -g keydb keydb
 # use gosu for easy step-down from root: https://github.com/tianon/gosu/releases
@@ -34,32 +35,35 @@ RUN set -eux; \
         savedAptMark="$(apt-mark showmanual)"; \
         apt-get update; \
         DEBIAN_FRONTEND=noninteractive apt-get install -qqy --no-install-recommends \
-                dpkg-dev \
-                pkg-config \
-                ca-certificates \
-                build-essential \
-                nasm \
-                autotools-dev \
-                autoconf \
-                libjemalloc-dev \
-                tcl \
-                tcl-dev \
-                uuid-dev \
-                libcurl4-openssl-dev \
-                libbz2-dev \
-                libzstd-dev \
-                liblz4-dev \
-                libsnappy-dev \
-                libssl-dev \
-                git; \
+        dpkg-dev \
+        pkg-config \
+        ca-certificates \
+        build-essential \
+        nasm \
+        autotools-dev \
+        autoconf \
+        libjemalloc-dev \
+        tcl \
+        tcl-dev \
+        uuid-dev \
+        libcurl4-openssl-dev \
+        libbz2-dev \
+        libzstd-dev \
+        liblz4-dev \
+        libsnappy-dev \
+        libssl-dev \
+        git; \
         cd /tmp/KeyDB; \
+        find . -type f \( -name "*.sh" -o -name configure -o -name build_detect_platform \) -exec sed -i 's/\r$//' {} +; \
         # disable protected mode as it relates to docker
+        sed -i 's/\r$//' ./src/config.cpp; \
         grep -E '^ *createBoolConfig[(]"protected-mode",.*, *1 *,.*[)],$' ./src/config.cpp; \
         sed -ri 's!^( *createBoolConfig[(]"protected-mode",.*, *)1( *,.*[)],)$!\10\2!' ./src/config.cpp; \
         grep -E '^ *createBoolConfig[(]"protected-mode",.*, *0 *,.*[)],$' ./src/config.cpp; \
         find . -type f -name "*.sh" -exec chmod +x {} +; \
         chmod +x ./deps/jemalloc/configure; \
-	chmod +x ./deps/rocksdb/build_tools/build_detect_platform; \
+        chmod +x ./deps/rocksdb/build_tools/build_detect_platform; \
+        make distclean; \
         make -j$(nproc) BUILD_TLS=yes ENABLE_FLASH=yes; \
         cd src; \
         strip keydb-cli keydb-benchmark keydb-check-rdb keydb-check-aof keydb-diagnostic-tool keydb-sentinel keydb-server; \
@@ -69,16 +73,16 @@ RUN set -eux; \
         apt-mark auto '.*' > /dev/null; \
         [ -z "$savedAptMark" ] || apt-mark manual $savedAptMark > /dev/null; \
         find /usr/local -type f -executable -exec ldd '{}' ';' \
-               | awk '/=>/ { print $(NF-1) }' \
-               | sed 's:.*/::' \
-               | sort -u \
-               | xargs -r dpkg-query --search \
-               | cut -d: -f1 \
-               | sort -u \
-               | xargs -r apt-mark manual \
+        | awk '/=>/ { print $(NF-1) }' \
+        | sed 's:.*/::' \
+        | sort -u \
+        | xargs -r dpkg-query --search \
+        | cut -d: -f1 \
+        | sort -u \
+        | xargs -r apt-mark manual \
         ; \
         apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false; \
-        rm -rf /var/lib/apt/lists/*; \
+        rm -rf /var/lib/apt/lists/*;
 # create working directories and organize files
 RUN \
         mkdir /data && chown keydb:keydb /data; \
@@ -100,7 +104,7 @@ RUN set -eux; \
         echo '#!/bin/sh' > /usr/local/bin/docker-entrypoint.sh; \
         echo 'set -e' >> /usr/local/bin/docker-entrypoint.sh; \
         echo "# first arg is '-f' or '--some-option'" >> /usr/local/bin/docker-entrypoint.sh; \
-        echo "# or first arg is `something.conf`" >> /usr/local/bin/docker-entrypoint.sh; \
+        echo '# or first arg is something.conf' >> /usr/local/bin/docker-entrypoint.sh; \
         echo 'if [ "${1#-}" != "$1" ] || [ "${1%.conf}" != "$1" ]; then' >> /usr/local/bin/docker-entrypoint.sh; \
         echo '        set -- keydb-server "$@"' >> /usr/local/bin/docker-entrypoint.sh; \
         echo 'fi' >> /usr/local/bin/docker-entrypoint.sh; \
@@ -108,7 +112,7 @@ RUN set -eux; \
         echo 'if [ -n "$KEYDB_PASSWORD" ]; then' >> /usr/local/bin/docker-entrypoint.sh; \
         echo '        set -- "$@" --requirepass "${KEYDB_PASSWORD}"' >> /usr/local/bin/docker-entrypoint.sh; \
         echo 'fi' >> /usr/local/bin/docker-entrypoint.sh; \
-        echo "# allow the container to be started with `--user`" >> /usr/local/bin/docker-entrypoint.sh; \
+        echo '# allow the container to be started with --user' >> /usr/local/bin/docker-entrypoint.sh; \
         echo 'if [ "$1" = "keydb-server" -a "$(id -u)" = "0" ]; then' >> /usr/local/bin/docker-entrypoint.sh; \
         echo "        find . \! -user keydb -exec chown keydb '{}' +" >> /usr/local/bin/docker-entrypoint.sh; \
         echo '        exec gosu keydb "$0" "$@"' >> /usr/local/bin/docker-entrypoint.sh; \
